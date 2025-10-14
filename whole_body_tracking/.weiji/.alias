@@ -1,0 +1,54 @@
+
+
+
+push-all (){
+    echo '---------------'
+    echo "Push srd"
+    git push srd wjx-tsl:byd
+    
+    echo '---------------'
+    echo "Push origin"
+    git push origin
+
+    echo '---------------'
+    echo "Push tele"
+    git push tele
+
+
+}
+
+VIS(){
+    python scripts/replay_npz.py --motion_file=$1
+}
+
+
+uplog() {
+    python .weiji/pack_logs.py --output_dir logs_backup --copy-event 1 --n_days 1 --max_id 1000000 --min_id 100 && python .weiji/syncfile.py -U logs_backup.tar.gz
+}
+
+downlog() {
+    python .weiji/syncfile.py -D logs_backup.tar.gz && python .weiji/unpack_logs.py --input logs_backup.tar.gz && rm logs_backup.tar.gz
+}
+
+
+LAFCSV(){
+    python scripts/csv_to_npz.py --input_file '/home/bai/LAFAN1_Retargeting_Dataset/g1/$1.csv' --input_fps 30 --output_name $1 --headless
+}
+
+STM(){
+    ls /home/bai/BeyondMimic/artifacts/Data10k-test | shuf -n 1
+}
+
+CPR (){
+    cp -r ./artifacts/Data10k-test/$1 artifacts/
+}
+
+
+_EM() {
+    python deploy/deploy_mujoco.py --motion_path=/home/bai/BeyondMimic/artifacts/$1/motion.npz --policy_path=/home/bai/BeyondMimic/logs/rsl_rl/DebugMJC-LargeAAC/2025-09-11_22-31-51_F5Obs-1024-Data10kT/exported/policy_20.5k.onnx
+}
+
+
+
+
+

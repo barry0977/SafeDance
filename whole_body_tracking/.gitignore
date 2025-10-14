@@ -1,0 +1,46 @@
+# Omniverse
+**/*.dmp
+**/.thumbs
+
+*.zip
+
+MUJOCO_LOG.TXT
+
+# Python
+.DS_Store
+**/*.egg-info/
+**/__pycache__/
+**/.pytest_cache/
+**/*.pyc
+**/*.pb
+
+# IDE
+**/.idea/
+
+
+# Outputs
+**/runs/*
+**/logs/*
+**/recordings/*
+**/output/*
+**/outputs/*
+**/videos/*
+**/wandb/*
+**/.neptune/*
+docker/artifacts/
+*.tmp
+
+# Isaac-Sim packman
+_isaac_sim*
+_repo
+_build
+.lastformat
+
+*.csv
+*.pkl
+*.zarr
+*.npz
+
+**/assets/
+artifacts/
+origin_data/

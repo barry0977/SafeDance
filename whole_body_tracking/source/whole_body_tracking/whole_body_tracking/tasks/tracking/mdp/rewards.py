@@ -84,7 +84,7 @@ def motion_relative_body_position_with_impedance_error_exp(
             "left_knee_link",            # 左小腿
             "right_hip_roll_link",       # 右大腿
             "right_knee_link",           # 右小腿
-            "torso_link",                # 躯干上部
+            #"torso_link",                # 躯干上部
             "left_shoulder_roll_link",   # 左大臂
             "left_elbow_link",           # 左小臂
             "right_shoulder_roll_link",  # 右大臂
@@ -92,11 +92,13 @@ def motion_relative_body_position_with_impedance_error_exp(
         ]
     key_indexes = _get_body_indexes(command, key_links)
     
-    # 检查是否有get_forces方法（可能在事件第一次执行前还未添加）
-    if hasattr(env, 'get_forces'):
-        force = env.get_forces()
-    else:
-        force = torch.zeros(env.num_envs, len(key_links), 3, device=env.device)
+    force = env.current_forces    # [E, L, 3]
+
+    # 检查环境是否注册了 current_forces 属性
+    # if hasattr(env, 'current_forces'):
+    #     force = env.current_forces    # 直接访问属性
+    # else:
+    #     force = torch.zeros(env.num_envs, len(key_links), 3, device=env.device)
     
     target_pos = command.body_pos_relative_w.clone()
     target_pos[:, key_indexes] += K * force

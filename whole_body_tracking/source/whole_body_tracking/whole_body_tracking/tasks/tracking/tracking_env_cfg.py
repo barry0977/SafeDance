@@ -103,6 +103,14 @@ class CommandsCfg:
         joint_position_range=(-0.1, 0.1),
     )
 
+    force = mdp.ForceCommandCfg(
+        asset_name="robot",
+        interval_steps=20,
+        duration_steps=10,
+        force_magnitude_range=(10.0, 20.0),
+        direction_mode="xyz_uniform",
+    )
+
 
 @configclass
 class ActionsCfg:
@@ -346,27 +354,27 @@ class EventCfg:
     )
 
     # interval
-    push_robot = EventTerm(
-        func=mdp.push_by_setting_velocity,
-        mode="interval",
-        interval_range_s=(1.0, 3.0),
-        params={"velocity_range": VELOCITY_RANGE},
-    )
+    # push_robot = EventTerm(
+    #     func=mdp.push_by_setting_velocity,
+    #     mode="interval",
+    #     interval_range_s=(1.0, 3.0),
+    #     params={"velocity_range": VELOCITY_RANGE},
+    # )
 
-    set_external_force = EventTerm(
-        func=mdp.apply_gradual_external_force,
-        mode="interval",
-        interval_range_s=(2.0, 5.0),  
-        params={
-            "asset_cfg": SceneEntityCfg("robot"),  # 必需参数：指定施加力的asset
-            "key_links": None,  # default key links
-            "max_force_range": (10.0, 40.0),
-            "duration_range": (1.0, 3.0),
-            "ramp_ratio": 0.3,  # 上升/下降阶段占比30%
-            "hold_ratio": 0.4,  # 保持阶段占比40%
-            "probability": 0.3  # 临时改为100%，确保每次都激活（调试用）
-        }
-    )
+    # set_external_force = EventTerm(
+    #     func=mdp.apply_gradual_external_force,
+    #     mode="interval",
+    #     interval_range_s=(2.0, 5.0),  
+    #     params={
+    #         "asset_cfg": SceneEntityCfg("robot"),  # 必需参数：指定施加力的asset
+    #         "key_links": None,  # default key links
+    #         "max_force_range": (10.0, 40.0),
+    #         "duration_range": (1.0, 3.0),
+    #         "ramp_ratio": 0.3,  # 上升/下降阶段占比30%
+    #         "hold_ratio": 0.4,  # 保持阶段占比40%
+    #         "probability": 0.3  # 临时改为100%，确保每次都激活（调试用）
+    #     }
+    # )
 
 
 @configclass

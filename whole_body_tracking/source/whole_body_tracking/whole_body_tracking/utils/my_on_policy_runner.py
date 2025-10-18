@@ -2,7 +2,8 @@ import os
 from typing import Optional
 
 from rsl_rl.env import VecEnv
-from rsl_rl.runners.on_policy_runner import OnPolicyRunner
+# 使用修改过的OnPolicyRunner
+from rsl_rl.runners.on_policy_runner1 import OnPolicyRunner1 as OnPolicyRunner
 
 from isaaclab_rl.rsl_rl import export_policy_as_onnx
 

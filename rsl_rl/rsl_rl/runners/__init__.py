@@ -6,5 +6,6 @@
 """Implementation of runners for environment-agent interaction."""
 
 from .on_policy_runner import OnPolicyRunner
+from .on_policy_runner1 import OnPolicyRunner1
 
-__all__ = ["OnPolicyRunner"]
+__all__ = ["OnPolicyRunner", "OnPolicyRunner1"]

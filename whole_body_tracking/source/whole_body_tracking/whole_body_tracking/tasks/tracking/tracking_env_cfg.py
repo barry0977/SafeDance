@@ -105,6 +105,7 @@ class CommandsCfg:
 
     force = mdp.ForceCommandCfg(
         asset_name="robot",
+        resampling_time_range=(1000000000.0, 1000000000.0),  # 很大的值，force命令不需要重采样
         interval_steps=20,
         duration_steps=10,
         force_magnitude_range=(10.0, 20.0),

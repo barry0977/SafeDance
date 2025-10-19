@@ -349,6 +349,17 @@ class MY_PPO:
             # Force Estimator: MSE loss between real forces and estimated forces
             estimated_forces = self.force_estimator(latent_feature_batch)
             force_loss = torch.nn.MSELoss()(real_forces_batch, estimated_forces)
+            
+            # DEBUG: 第一次计算时打印信息
+            if not hasattr(self, '_debug_force_loss_printed'):
+                self._debug_force_loss_printed = True
+                real_force_norm = torch.linalg.vector_norm(real_forces_batch.view(-1, 9, 3), dim=-1).mean().item()
+                est_force_norm = torch.linalg.vector_norm(estimated_forces.view(-1, 9, 3), dim=-1).mean().item()
+                print(f"[DEBUG MY_PPO.update] 第一次计算 force_loss:")
+                print(f"  real_forces_batch shape: {real_forces_batch.shape}, avg_norm: {real_force_norm:.3f}")
+                print(f"  estimated_forces shape: {estimated_forces.shape}, avg_norm: {est_force_norm:.3f}")
+                print(f"  force_loss: {force_loss.item():.6f}")
+            
             loss += 0.2*force_loss
 
 

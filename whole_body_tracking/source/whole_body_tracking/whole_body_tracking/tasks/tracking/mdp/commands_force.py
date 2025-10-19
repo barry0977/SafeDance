@@ -51,14 +51,16 @@ class ForceCommand(CommandTerm):
         self.metrics["force_norm_max"]      = torch.zeros(self.num_envs, device=self.device)
         self.metrics["applied_links_count"] = torch.zeros(self.num_envs, device=self.device)
 
-        env.register_attr("current_forces", self.current_forces)
+        # 直接将 current_forces 设置为环境的属性，方便其他地方访问
+        env.unwrapped.current_forces = self.current_forces
+        print(f"[DEBUG ForceCommand.__init__] 设置 env.unwrapped.current_forces, shape: {self.current_forces.shape}, device: {self.current_forces.device}")
 
     @property
     def command(self) -> torch.Tensor:  # TODO Consider again if this is the best observation
-        return self._current_force.view(self.num_envs, -1)    # shape [E, 3*L]
+        return self.current_forces.view(self.num_envs, -1)    # shape [E, 3*L]
 
     def _update_metrics(self):
-        force_norm = torch.linalg.vector_norm(self.current_force, dim=-1)   # [E, L]
+        force_norm = torch.linalg.vector_norm(self.current_forces, dim=-1)   # [E, L]
         active = self.duration_left > 0                                      # [E]
         self.metrics["force_active"]        = active.float()
         self.metrics["force_norm_avg"]      = force_norm.mean(dim=-1)

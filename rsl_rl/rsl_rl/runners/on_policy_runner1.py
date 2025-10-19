@@ -94,7 +94,8 @@ class OnPolicyRunner1:
             self.alg_cfg["symmetry_cfg"]["_env"] = env
 
         # initialize algorithm
-        #alg_class = eval(self.alg_cfg.pop("class_name"))
+        # 移除 class_name，因为我们硬编码使用 MY_PPO
+        self.alg_cfg.pop("class_name", None)  # 安全地移除，如果不存在也不报错
         self.alg: MY_PPO = MY_PPO(
             policy, device=self.device, feature_dim=feature_dim, raw_obs_dim=num_obs, **self.alg_cfg, multi_gpu_cfg=self.multi_gpu_cfg
         )
@@ -222,8 +223,25 @@ class OnPolicyRunner1:
                         real_forces = self.env.unwrapped.current_forces.clone()  # [num_envs, num_links, 3]
                         # 展平成 [num_envs, num_links*3] 方便存储
                         real_forces_flat = real_forces.view(self.env.num_envs, -1)
+                        
+                        # DEBUG: 每100步打印一次读取的力信息
+                        if not hasattr(self, '_debug_force_step'):
+                            self._debug_force_step = 0
+                        self._debug_force_step += 1
+                        if self._debug_force_step % 10 == 0:
+                            force_norm_all = torch.linalg.vector_norm(real_forces, dim=-1)  # [num_envs, num_links]
+                            force_norm_per_env = force_norm_all.mean(dim=1)  # [num_envs]
+                            active_envs = (force_norm_per_env > 0.1).sum().item()
+                            inactive_envs = (force_norm_per_env <= 0.1).sum().item()
+                            avg_all = force_norm_per_env.mean().item()
+                            avg_active = force_norm_per_env[force_norm_per_env > 0.1].mean().item() if active_envs > 0 else 0
+                            print(f"[DEBUG OnPolicyRunner] Step {self._debug_force_step}: "
+                                  f"shape={real_forces.shape}, "
+                                  f"active={active_envs}/{self.env.num_envs}, "
+                                  f"avg_all={avg_all:.3f}, avg_active={avg_active:.3f}")
                     else:
                         real_forces_flat = torch.zeros(self.env.num_envs, 27, device=self.device)  # 假设 9 links * 3
+                        print(f"[DEBUG OnPolicyRunner] ⚠️ 警告: env.unwrapped 没有 current_forces 属性！")
                     infos["real_forces"] = real_forces_flat  
                     # process the step
                     self.alg.process_env_step(rewards, dones, infos)
@@ -270,7 +288,9 @@ class OnPolicyRunner1:
 
             # update policy
             loss_dict = self.alg.update()
-
+            print("-------------------------------------------------------")
+            print("loss_dict: ", loss_dict)
+            print("-------------------------------------------------------")
             stop = time.time()
             learn_time = stop - start
             self.current_learning_iteration = it

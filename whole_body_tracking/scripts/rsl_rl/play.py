@@ -1,6 +1,6 @@
 """Script to play a checkpoint if an RL agent from RSL-RL."""
 """Launch Isaac Sim Simulator first."""
-EXPORT_ONNX = True
+EXPORT_ONNX = False  # 临时禁用，因为使用的是不兼容的旧检查点
 
 import argparse
 import sys
@@ -44,7 +44,8 @@ import os
 import pathlib
 import torch
 
-from rsl_rl.runners import OnPolicyRunner
+# 使用与训练时相同的 runner（支持 MY_PPO + Encoder）
+from whole_body_tracking.utils.my_on_policy_runner import MotionOnPolicyRunner as OnPolicyRunner
 
 from isaaclab.envs import (
     DirectMARLEnv,
@@ -169,10 +170,14 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         # export policy to onnx/jit
         export_model_dir = os.path.join(os.path.dirname(resume_path), "exported")
 
+        # 如果使用了 MY_PPO，传入 encoder
+        encoder = getattr(ppo_runner.alg, 'encoder', None)
+        
         export_motion_policy_as_onnx(
             env.unwrapped,
             ppo_runner.alg.policy,
             normalizer=ppo_runner.obs_normalizer,
+            encoder=encoder,
             path=export_model_dir,
             filename="policy.onnx",
         )

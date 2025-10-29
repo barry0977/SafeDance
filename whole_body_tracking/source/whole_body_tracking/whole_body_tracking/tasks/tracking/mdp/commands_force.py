@@ -74,11 +74,19 @@ class ForceCommand(CommandTerm):
         # 每个env随机一个方向
         direction = torch.randn(len(env_ids), 3, device=self.device)
         direction = direction / (direction.norm(dim=-1, keepdim=True) + 1e-6)
-        # 每个env每个link随机一个力大小
-        magnitude = torch.rand(len(env_ids), self.num_links, 1, device=self.device)
-        magnitude = magnitude * (self.force_max - self.force_min) + self.force_min
+        # 每个env随机一个力大小（对数均匀分布）
+        u = torch.rand(len(env_ids), 1, device=self.device)
+        log_min = math.log(self.force_min + 1e-6)
+        log_max = math.log(self.force_max + 1e-6)
+        magnitude = torch.exp(log_min + u * (log_max - log_min))
+        # 每个env随机一个 link 施加力
+        link_indices = torch.randint(0, self.num_links, (len(env_ids),), device=self.device)
 
-        self.current_forces[env_ids] = direction.unsqueeze(1) * magnitude # 要把direction的维度扩展到和magnitude一致
+        # 构造 forces 张量，先全 0，再在选中 link 上填充值
+        forces = torch.zeros(len(env_ids), self.num_links, 3, device=self.device)
+        forces[torch.arange(len(env_ids)), link_indices] = direction * magnitude
+
+        self.current_forces[env_ids] = forces
         self.duration_left[env_ids] = self.duration_steps
         self.time_to_next_sample[env_ids] = self.interval_steps + self.duration_steps
 

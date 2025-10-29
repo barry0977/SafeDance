@@ -2,9 +2,9 @@ import os
 from typing import Optional
 
 from rsl_rl.env import VecEnv
-# 使用修改过的OnPolicyRunner
-from rsl_rl.runners.on_policy_runner1 import OnPolicyRunner1 as OnPolicyRunner
 
+from rsl_rl.runners.on_policy_runner1 import OnPolicyRunner1 as OnPolicyRunner
+# from rsl_rl.runners.on_policy_runner import OnPolicyRunner
 from isaaclab_rl.rsl_rl import export_policy_as_onnx
 
 import wandb
@@ -40,10 +40,15 @@ class MotionOnPolicyRunner(OnPolicyRunner):
         if self.logger_type in ["wandb"]:
             policy_path = path.split("model")[0]
             filename = policy_path.split("/")[-2] + ".onnx"
+            
+            # 如果使用了 MY_PPO，传入 encoder
+            encoder = getattr(self.alg, 'encoder', None)
+            
             export_motion_policy_as_onnx(
                 self.env.unwrapped,
                 self.alg.policy,
                 normalizer=self.obs_normalizer,
+                encoder=encoder,
                 path=policy_path,
                 filename=filename
             )

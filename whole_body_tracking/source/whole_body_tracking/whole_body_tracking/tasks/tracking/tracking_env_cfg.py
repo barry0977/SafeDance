@@ -108,7 +108,7 @@ class CommandsCfg:
         resampling_time_range=(1000000000.0, 1000000000.0),  # 很大的值，force命令不需要重采样
         interval_steps=20,
         duration_steps=10,
-        force_magnitude_range=(10.0, 20.0),
+        force_magnitude_range=(5.0, 40.0),
         direction_mode="xyz_uniform",
     )
 
@@ -169,8 +169,8 @@ class ObservationsCfg:
 
     # observation groups
     policy: PolicyCfg = PolicyCfg()
-    #critic: PrivilegedCfg = PrivilegedCfg()
-    critic: PolicyCfg = PolicyCfg()
+    critic: PrivilegedCfg = PrivilegedCfg()
+    # critic: PolicyCfg = PolicyCfg()
 
 
 @configclass
@@ -362,21 +362,6 @@ class EventCfg:
     #     params={"velocity_range": VELOCITY_RANGE},
     # )
 
-    # set_external_force = EventTerm(
-    #     func=mdp.apply_gradual_external_force,
-    #     mode="interval",
-    #     interval_range_s=(2.0, 5.0),  
-    #     params={
-    #         "asset_cfg": SceneEntityCfg("robot"),  # 必需参数：指定施加力的asset
-    #         "key_links": None,  # default key links
-    #         "max_force_range": (10.0, 40.0),
-    #         "duration_range": (1.0, 3.0),
-    #         "ramp_ratio": 0.3,  # 上升/下降阶段占比30%
-    #         "hold_ratio": 0.4,  # 保持阶段占比40%
-    #         "probability": 0.3  # 临时改为100%，确保每次都激活（调试用）
-    #     }
-    # )
-
 
 @configclass
 class RewardsCfg:
@@ -398,21 +383,21 @@ class RewardsCfg:
             "std": 0.4
         },
     )
-    #motion_body_pos = RewTerm(
+    # motion_body_pos = RewTerm(
     #    func=mdp.motion_relative_body_position_error_exp,
     #    weight=1.0,
     #    params={
     #        "command_name": "motion",
     #        "std": 0.3
     #    },
-    #)
+    # )
     motion_body_pos = RewTerm(
         func=mdp.motion_relative_body_position_with_impedance_error_exp,
         weight=2.0,
         params={
             "command_name": "motion",
             "std": 0.3,
-            "K": 0.005
+            "K": 0.01
         },
     )
     motion_body_ori = RewTerm(
@@ -532,7 +517,8 @@ class TrackingEnvCfg(ManagerBasedRLEnvCfg):
         """Post initialization."""
         # general settings
         self.decimation = 4
-        self.episode_length_s = 10.0
+        # self.episode_length_s = 10.0
+        self.episode_length_s = 100000000000000.0
         # simulation settings
         self.sim.dt = 0.005
         self.sim.render_interval = self.decimation

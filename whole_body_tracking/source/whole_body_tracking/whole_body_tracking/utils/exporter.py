@@ -19,20 +19,28 @@ def export_motion_policy_as_onnx(
     actor_critic: object,
     path: str,
     normalizer: object | None = None,
+    encoder: object | None = None,
     filename="policy.onnx",
     verbose=False,
 ):
     if not os.path.exists(path):
         os.makedirs(path, exist_ok=True)
-    policy_exporter = _OnnxMotionPolicyExporter(env, actor_critic, normalizer, verbose)
+    policy_exporter = _OnnxMotionPolicyExporter(env, actor_critic, normalizer, encoder, verbose)
     policy_exporter.export(path, filename)
 
 
 class _OnnxMotionPolicyExporter(_OnnxPolicyExporter):
-    def __init__(self, env: ManagerBasedRLEnv, actor_critic, normalizer=None, verbose=False):
+    def __init__(self, env: ManagerBasedRLEnv, actor_critic, normalizer=None, encoder=None, verbose=False):
         super().__init__(actor_critic, normalizer, verbose)
+        # 保存 encoder（如果使用了 MY_PPO）
+        if encoder is not None:
+            import copy
+            self.encoder = copy.deepcopy(encoder)
+            self.encoder.cpu()
+        else:
+            self.encoder = None
+        
         # cmd: MotionCommand = env.command_manager.get_term("motion")
-
         # self.joint_pos = cmd.motion.joint_pos.to("cpu")
         # self.joint_vel = cmd.motion.joint_vel.to("cpu")
         # self.body_pos_w = cmd.motion.body_pos_w.to("cpu")
@@ -42,6 +50,10 @@ class _OnnxMotionPolicyExporter(_OnnxPolicyExporter):
         # self.time_step_total = self.joint_pos.shape[0]
 
     def forward(self, x):
+        # 如果有 encoder，先编码
+        if self.encoder is not None:
+            x = self.encoder(x)
+        # 然后归一化和通过 actor
         return (self.actor(self.normalizer(x)), )
 
     def _forward_bak(self, x, time_step):
@@ -58,7 +70,14 @@ class _OnnxMotionPolicyExporter(_OnnxPolicyExporter):
 
     def export(self, path, filename):
         self.to("cpu")
-        obs = torch.zeros(1, self.actor[0].in_features)
+        # 如果有 encoder，输入维度是 encoder 的输入；否则是 actor 的输入
+        if self.encoder is not None:
+            # Encoder 是一个自定义类，它的 Sequential 在 self.encoder.encoder 中
+            input_dim = self.encoder.encoder[0].in_features  # encoder 的输入维度（原始观测）
+        else:
+            input_dim = self.actor[0].in_features  # actor 的输入维度
+        
+        obs = torch.zeros(1, input_dim)
         torch.onnx.export(
             self,
             (obs, ),

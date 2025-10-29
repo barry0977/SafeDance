@@ -33,6 +33,7 @@ class MY_PPO:
         lam=0.95,
         value_loss_coef=1.0,
         entropy_coef=0.0,
+        force_loss_coef=0.2,
         learning_rate=1e-3,
         max_grad_norm=1.0,
         use_clipped_value_loss=True,
@@ -113,6 +114,7 @@ class MY_PPO:
         self.num_mini_batches = num_mini_batches
         self.value_loss_coef = value_loss_coef
         self.entropy_coef = entropy_coef
+        self.force_loss_coef = force_loss_coef
         self.gamma = gamma
         self.lam = lam
         self.max_grad_norm = max_grad_norm
@@ -360,7 +362,7 @@ class MY_PPO:
                 print(f"  estimated_forces shape: {estimated_forces.shape}, avg_norm: {est_force_norm:.3f}")
                 print(f"  force_loss: {force_loss.item():.6f}")
             
-            loss += 0.2*force_loss
+            loss += self.force_loss_coef*force_loss
 
 
             # Symmetry loss

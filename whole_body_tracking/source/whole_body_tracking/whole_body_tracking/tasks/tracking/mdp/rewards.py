@@ -92,14 +92,8 @@ def motion_relative_body_position_with_impedance_error_exp(
         ]
     key_indexes = _get_body_indexes(command, key_links)
     
-    force = env.current_forces    # [E, L, 3]
+    force = env.current_forces  
 
-    # 检查环境是否注册了 current_forces 属性
-    # if hasattr(env, 'current_forces'):
-    #     force = env.current_forces    # 直接访问属性
-    # else:
-    #     force = torch.zeros(env.num_envs, len(key_links), 3, device=env.device)
-    
     target_pos = command.body_pos_relative_w.clone()
     target_pos[:, key_indexes] += K * force
     error = torch.sum(torch.square(target_pos[:, body_indexes] - command.robot_body_pos_w[:, body_indexes]), dim=-1)

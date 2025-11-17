@@ -186,6 +186,10 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     obs, _ = env.get_observations()
     timestep = 0
 
+
+    _encoder = ppo_runner.alg.encoder
+    _force_estimator = ppo_runner.alg.force_estimator
+    _policy = ppo_runner.alg.policy
     print("Start playing...")
     # simulate environment
     while simulation_app.is_running():
@@ -193,6 +197,16 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         with torch.inference_mode():
             # agent stepping
             actions = policy(obs)
+            latent_feature = _encoder(obs)
+            estimated_force = _force_estimator(latent_feature).squeeze(0)
+            estimated_force_magnitude = torch.norm(estimated_force, dim=0)
+            print("________________________________")
+            print(f"Estimated force: {estimated_force}")
+            real_force_flat = env.unwrapped.current_forces.view(env.num_envs, -1).squeeze(0)
+            real_force_magnitude = torch.norm(real_force_flat, dim=0)
+            print(f"Real force: {real_force_flat}")
+            print(f"magnitude: {estimated_force_magnitude}, {real_force_magnitude}")
+            print("________________________________")
             # env stepping
             obs, _, _, _ = env.step(actions)
         if args_cli.video:

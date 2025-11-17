@@ -75,6 +75,21 @@ class MySceneCfg(InteractiveSceneCfg):
         force_threshold=10.0,
         debug_vis=True
     )
+    # Add cube in the way
+    # cube = AssetBaseCfg(
+    #     prim_path="/World/obstacle",
+    #     spawn=sim_utils.CuboidCfg(
+    #         # size=(0.5, 0.5, 1.0),
+    #         size=(0.2, 2, 2),
+    #         rigid_props=sim_utils.RigidBodyPropertiesCfg(),
+    #         collision_props=sim_utils.CollisionPropertiesCfg(),
+    #         visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(1.0, 0.2, 0.2)),
+    #     ),
+    #     init_state=AssetBaseCfg.InitialStateCfg(
+    #         pos=(1.0, -0.23, 0.15),
+    #         rot=(1.0, 0.0, 0.0, 0.0),
+    #     ),
+    # )
 
 
 ##
@@ -87,7 +102,7 @@ class CommandsCfg:
     """Command specifications for the MDP."""
 
     motion = mdp.MotionCommandCfg(
-        future_steps=5,  # Future N-step lookahead
+        future_steps=1,  # Future N-step lookahead
         asset_name="robot",
         resampling_time_range=(1.0e9, 1.0e9),
         debug_vis=True,
@@ -105,10 +120,11 @@ class CommandsCfg:
 
     force = mdp.ForceCommandCfg(
         asset_name="robot",
-        resampling_time_range=(1000000000.0, 1000000000.0),  # 很大的值，force命令不需要重采样
+        resampling_time_range=(1.0e9, 1.0e9),
         interval_steps=20,
         duration_steps=10,
-        force_magnitude_range=(5.0, 40.0),
+        ramp_fraction=0.2,
+        force_magnitude_range=(10.0, 200.0),
         direction_mode="xyz_uniform",
     )
 
@@ -168,9 +184,9 @@ class ObservationsCfg:
         actions = ObsTerm(func=mdp.last_action)
 
     # observation groups
-    policy: PolicyCfg = PolicyCfg()
-    critic: PrivilegedCfg = PrivilegedCfg()
-    # critic: PolicyCfg = PolicyCfg()
+    # 增加历史信息（降低以节省 GPU 内存）
+    policy: PolicyCfg = PolicyCfg(history_length=5)
+    critic: PrivilegedCfg = PrivilegedCfg(history_length=5)
 
 
 @configclass
@@ -393,11 +409,11 @@ class RewardsCfg:
     # )
     motion_body_pos = RewTerm(
         func=mdp.motion_relative_body_position_with_impedance_error_exp,
-        weight=2.0,
+        weight=1.0,
         params={
             "command_name": "motion",
             "std": 0.3,
-            "K": 0.01
+            "K": 0.005
         },
     )
     motion_body_ori = RewTerm(
@@ -517,8 +533,8 @@ class TrackingEnvCfg(ManagerBasedRLEnvCfg):
         """Post initialization."""
         # general settings
         self.decimation = 4
-        # self.episode_length_s = 10.0
-        self.episode_length_s = 100000000000000.0
+        self.episode_length_s = 10.0
+        #self.episode_length_s = 100000000000000.0 # 评估时使用
         # simulation settings
         self.sim.dt = 0.005
         self.sim.render_interval = self.decimation

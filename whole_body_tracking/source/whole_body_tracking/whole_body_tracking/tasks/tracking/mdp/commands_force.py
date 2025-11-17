@@ -40,11 +40,17 @@ class ForceCommand(CommandTerm):
         self.current_forces = torch.zeros(self.num_envs, len(self.cfg.body_names), 3, device=self.device)
         self.time_to_next_sample = torch.zeros(self.num_envs, device=self.device) # 到下一次sample剩余步数
         self.duration_left = torch.zeros(self.num_envs, device=self.device) # 当前force持续剩余步数
-       
+        self.force_scale = torch.zeros(self.num_envs, device=self.device) # 当前force缩放系数
+
         self.interval_steps = cfg.interval_steps
         self.duration_steps = cfg.duration_steps
         self.force_min, self.force_max = cfg.force_magnitude_range
         self.direction_mode = cfg.direction_mode
+        self.ramp_fraction = cfg.ramp_fraction
+        # 上升/下降步数
+        self.ramp_steps = max(1, int(self.duration_steps * self.ramp_fraction))
+        # 保持恒定阶段步数
+        self.hold_steps = max(0, self.duration_steps - 2 * self.ramp_steps)
 
         self.metrics["force_active"]        = torch.zeros(self.num_envs, device=self.device)
         self.metrics["force_norm_avg"]      = torch.zeros(self.num_envs, device=self.device)
@@ -99,6 +105,15 @@ class ForceCommand(CommandTerm):
 
         env_active = torch.where(self.duration_left > 0)[0]
         env_inactive = torch.where(self.duration_left <= 0)[0]
+        # 计算当前应该施加的力
+        time_passed = self.duration_steps - self.duration_left
+        env_up = torch.where(time_passed < self.ramp_steps)[0]
+        env_down = torch.where(time_passed >= self.ramp_steps + self.hold_steps)[0]
+        force_scale = torch.ones(self.num_envs, device=self.device)
+        force_scale[env_up] = time_passed[env_up] / self.ramp_steps
+        force_scale[env_down] = 1.0 - (time_passed[env_down] - self.ramp_steps - self.hold_steps) / self.ramp_steps
+        force_scale = self.force_scale.view(-1, 1, 1)
+        current_forces = self.current_forces * force_scale
         # 对激活环境施加力
         if env_active.numel() > 0:
             self.robot.set_external_force_and_torque(
@@ -148,6 +163,7 @@ class ForceCommandCfg(CommandTermCfg):
 
     interval_steps: int = MISSING
     duration_steps: int = MISSING
+    ramp_fraction: float = MISSING
     force_magnitude_range: tuple[float, float] = MISSING
     direction_mode: str = MISSING
 

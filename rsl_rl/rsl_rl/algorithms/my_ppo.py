@@ -154,7 +154,8 @@ class MY_PPO:
         # compute the actions and values
         self.transition.latent_feature = self.encoder(obs)
         self.transition.actions = self.policy.act(self.transition.latent_feature).detach()
-        self.transition.values = self.policy.evaluate(self.transition.latent_feature).detach()
+        # Critic: use original critic_obs (not encoder output)
+        self.transition.values = self.policy.evaluate(critic_obs).detach()
         self.transition.actions_log_prob = self.policy.get_actions_log_prob(self.transition.actions).detach()
         self.transition.action_mean = self.policy.action_mean.detach()
         self.transition.action_sigma = self.policy.action_std.detach()
@@ -196,8 +197,7 @@ class MY_PPO:
 
     def compute_returns(self, last_critic_obs):
         # compute value for the last step
-        latent_feature = self.encoder(last_critic_obs)
-        last_values = self.policy.evaluate(latent_feature).detach()
+        last_values = self.policy.evaluate(last_critic_obs).detach()
         self.storage.compute_returns(
             last_values, self.gamma, self.lam, normalize_advantage=not self.normalize_advantage_per_mini_batch
         )
@@ -282,7 +282,7 @@ class MY_PPO:
             self.policy.act(latent_feature_batch, masks=masks_batch, hidden_states=hid_states_batch[0])
             actions_log_prob_batch = self.policy.get_actions_log_prob(actions_batch)
             # -- critic
-            value_batch = self.policy.evaluate(latent_feature_batch, masks=masks_batch, hidden_states=hid_states_batch[1])
+            value_batch = self.policy.evaluate(critic_obs_batch, masks=masks_batch, hidden_states=hid_states_batch[1])
             # -- entropy
             # we only keep the entropy of the first augmentation (the original one)
             mu_batch = self.policy.action_mean[:original_batch_size]
@@ -351,16 +351,6 @@ class MY_PPO:
             # Force Estimator: MSE loss between real forces and estimated forces
             estimated_forces = self.force_estimator(latent_feature_batch)
             force_loss = torch.nn.MSELoss()(real_forces_batch, estimated_forces)
-            
-            # DEBUG: 第一次计算时打印信息
-            if not hasattr(self, '_debug_force_loss_printed'):
-                self._debug_force_loss_printed = True
-                real_force_norm = torch.linalg.vector_norm(real_forces_batch.view(-1, 9, 3), dim=-1).mean().item()
-                est_force_norm = torch.linalg.vector_norm(estimated_forces.view(-1, 9, 3), dim=-1).mean().item()
-                print(f"[DEBUG MY_PPO.update] 第一次计算 force_loss:")
-                print(f"  real_forces_batch shape: {real_forces_batch.shape}, avg_norm: {real_force_norm:.3f}")
-                print(f"  estimated_forces shape: {estimated_forces.shape}, avg_norm: {est_force_norm:.3f}")
-                print(f"  force_loss: {force_loss.item():.6f}")
             
             loss += self.force_loss_coef*force_loss
 

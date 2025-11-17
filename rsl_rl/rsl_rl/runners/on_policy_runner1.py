@@ -72,7 +72,7 @@ class OnPolicyRunner1:
         # evaluate the policy class
         policy_class = eval(self.policy_cfg.pop("class_name"))
         policy: ActorCritic | ActorCriticRecurrent | StudentTeacher | StudentTeacherRecurrent = policy_class(
-            feature_dim, feature_dim, self.env.num_actions, **self.policy_cfg
+            feature_dim, num_privileged_obs, self.env.num_actions, **self.policy_cfg
         ).to(self.device)
 
         # resolve dimension of rnd gated state
@@ -222,26 +222,7 @@ class OnPolicyRunner1:
                     if hasattr(self.env.unwrapped, 'current_forces'):
                         real_forces = self.env.unwrapped.current_forces.clone()  # [num_envs, num_links, 3]
                         # 展平成 [num_envs, num_links*3] 方便存储
-                        real_forces_flat = real_forces.view(self.env.num_envs, -1)
-                        
-                        # DEBUG: 每100步打印一次读取的力信息
-                        if not hasattr(self, '_debug_force_step'):
-                            self._debug_force_step = 0
-                        self._debug_force_step += 1
-                        if self._debug_force_step % 100 == 0:
-                            force_norm_all = torch.linalg.vector_norm(real_forces, dim=-1)  # [num_envs, num_links]
-                            force_norm_per_env = force_norm_all.mean(dim=1)  # [num_envs]
-                            active_envs = (force_norm_per_env > 0.1).sum().item()
-                            inactive_envs = (force_norm_per_env <= 0.1).sum().item()
-                            avg_all = force_norm_per_env.mean().item()
-                            avg_active = force_norm_per_env[force_norm_per_env > 0.1].mean().item() if active_envs > 0 else 0
-                            
-                            
-                            print(f"[DEBUG OnPolicyRunner] Step {self._debug_force_step}: "
-                                  f"shape={real_forces.shape}, "
-                                  f"active={active_envs}/{self.env.num_envs}, "
-                                  f"avg_all={avg_all:.3f}, avg_active={avg_active:.3f}")
-                            
+                        real_forces_flat = real_forces.view(self.env.num_envs, -1)                         
                     else:
                         real_forces_flat = torch.zeros(self.env.num_envs, 27, device=self.device)  # 假设 9 links * 3
                         print(f"[DEBUG OnPolicyRunner] ⚠️ 警告: env.unwrapped 没有 current_forces 属性！")
@@ -287,13 +268,11 @@ class OnPolicyRunner1:
 
                 # compute returns
                 if self.training_type == "rl":
-                    self.alg.compute_returns(obs) # encoder输入为obs
+                    self.alg.compute_returns(privileged_obs)
 
             # update policy
             loss_dict = self.alg.update()
-            print("-------------------------------------------------------")
-            print("loss_dict: ", loss_dict)
-            print("-------------------------------------------------------")
+
             stop = time.time()
             learn_time = stop - start
             self.current_learning_iteration = it

@@ -50,11 +50,18 @@ class _OnnxMotionPolicyExporter(_OnnxPolicyExporter):
         # self.time_step_total = self.joint_pos.shape[0]
 
     def forward(self, x):
-        # 如果有 encoder，先编码
+        """推理时的前向流程应与训练一致：先归一化 → 再编码 → 最后进入 Actor。"""
+
+        # 1. 归一化（若提供 normalizer）
+        if self.normalizer is not None:
+            x = self.normalizer(x)
+
+        # 2. 编码（若使用了 MY_PPO 的 encoder）
         if self.encoder is not None:
             x = self.encoder(x)
-        # 然后归一化和通过 actor
-        return (self.actor(self.normalizer(x)), )
+
+        # 3. Actor 输出动作
+        return (self.actor(x), )
 
     def _forward_bak(self, x, time_step):
         # time_step_clamped = torch.clamp(time_step.long().squeeze(-1), max=self.time_step_total - 1)
@@ -70,12 +77,15 @@ class _OnnxMotionPolicyExporter(_OnnxPolicyExporter):
 
     def export(self, path, filename):
         self.to("cpu")
-        # 如果有 encoder，输入维度是 encoder 的输入；否则是 actor 的输入
-        if self.encoder is not None:
-            # Encoder 是一个自定义类，它的 Sequential 在 self.encoder.encoder 中
-            input_dim = self.encoder.encoder[0].in_features  # encoder 的输入维度（原始观测）
+        # 输入维度应该始终是“原始观测维度”，即 normalizer 的输入维度
+        if self.normalizer is not None:
+            input_dim = self.normalizer._mean.shape[1]
         else:
-            input_dim = self.actor[0].in_features  # actor 的输入维度
+            # fallback：从 encoder 或 actor 推断
+            if self.encoder is not None:
+                input_dim = self.encoder.encoder[0].in_features
+            else:
+                input_dim = self.actor[0].in_features
         
         obs = torch.zeros(1, input_dim)
         torch.onnx.export(

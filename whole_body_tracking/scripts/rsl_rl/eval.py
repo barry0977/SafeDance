@@ -24,7 +24,7 @@ parser.add_argument("--resume_path", type=str, default=None, help="Path to the r
 parser.add_argument("--motion_file", type=str, default=None, help="Path to the motion file.")
 parser.add_argument("--num_trials", type=int, default=1000)
 parser.add_argument("--force_list", type=float, nargs="+",
-                    default=[0, 10, 20, 30, 40, 50, 60, 70])         # 以 N 为单位
+                    default=[0, 50, 100, 150, 200, 250, 300, 350, 400, 450, 500])         # 以 N 为单位
 
 
 # append RSL-RL cli arguments
@@ -159,51 +159,31 @@ def evaluate(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg,
         # 记录上一步的 time_steps，用于检测 motion 完成后的重置
         prev_time_steps = motion_cmd.time_steps.clone()
 
-        step_count = 0
-        max_steps = 30000  # 增加上限，因为 episode 时长增加了且每个环境可能评测多次
-
-        while total_episodes < args_cli.num_trials and step_count < max_steps:
+        while total_episodes < args_cli.num_trials :
             # 使用 no_grad 而不是 inference_mode，避免影响环境重置
             with torch.no_grad():
                 actions = policy(obs)
                 obs, rew, dones, extras = env.step(actions)
-
-            step_count += 1
-
-            # 检查两种完成情况：
-            # 1. 完整完成 motion（time_steps 被重置，说明 _resample_command 被调用）
-            # 2. 提前 done（摔倒、偏差过大等，会触发环境重置）
             
             # 情况1：检查是否有环境完整完成了 motion
             # motion 完成后，_resample_command 会被调用，time_steps 会被重置为 0（或很小的值）
             # 检测条件：当前 time_steps < 上一步 time_steps（说明被重置了）且没有 done
             curr_time_steps = motion_cmd.time_steps
-            motion_just_completed = (curr_time_steps < prev_time_steps) & (~dones.bool())
+            finish = curr_time_steps < prev_time_steps
             
-            if motion_just_completed.any():
-                completed_ids = torch.nonzero(motion_just_completed, as_tuple=False).squeeze(-1)
+            if finish.any():
+                completed_ids = torch.nonzero(finish, as_tuple=False).squeeze(-1)
                 for env_id in completed_ids:
                     total_episodes += 1      
+                    failed += dones[env_id].item()
+                    print(f"[DONE] Env {env_id.item()} 终止\t  (failed={dones[env_id].item()}, time_step={prev_time_steps[env_id].item()}/{motion_cmd.motion_length[env_id].item()})")
+
                     if total_episodes >= args_cli.num_trials:
                         break
             
             # 更新 prev_time_steps
             prev_time_steps = curr_time_steps.clone()
             
-            # 情况2：检查提前 done 的环境（摔倒、偏差过大等）
-            if dones.any():
-                done_mask = dones.bool()
-                done_ids = torch.nonzero(done_mask, as_tuple=False).squeeze(-1)
-
-                for env_id in done_ids:
-                    total_episodes += 1
-                    # 提前 done 都算失败（摔倒、姿态错误等）
-                    failed += 1
-                    if failed <= 20:  # 只打印前20次失败，避免输出过多
-                        print(f"[FAILED] Env {env_id.item()} 提前终止 (time_step={prev_time_steps[env_id].item()}/{motion_cmd.motion_length[env_id].item()})")
-
-                    if total_episodes >= args_cli.num_trials:
-                        break
 
         # 6-6 输出结果
         success = total_episodes - failed
@@ -215,11 +195,11 @@ def evaluate(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg,
 
     # close the simulator
     env.close()
+    print("\n" + "="*60)
+    print("最终评测结果:")
+    print_dict(results, nesting=2)
     return results
 
 if __name__ == "__main__":
-    final_results = evaluate()
-    print("\n" + "="*60)
-    print("最终评测结果:")
-    print_dict(final_results, nesting=2)
+    evaluate()
     simulation_app.close()

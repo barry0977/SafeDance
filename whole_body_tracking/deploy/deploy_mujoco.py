@@ -729,21 +729,26 @@ if __name__ == "__main__":
 
             print("t: ", inner_counter, "/", T)
             obs = compute_observation(d, motion_loader, inner_counter, action)
+            # print(inner_counter, "step 1 ")
             obs_tensor = np.array(obs, dtype=np.float32).reshape(1, -1)
+            # print(inner_counter, "step 2 ")
 
             output = session.run(None, {obs_name: obs_tensor})
+            # print(inner_counter, "step 3 ")
             action = output[0].squeeze()
+            # print(inner_counter, "step 4 ")
 
             # transform action to target_dof_pos
             target_dof_pos = action[isaaclab_to_mujoco_reindex] * action_scale + default_angles
+            # print(inner_counter, "step 5 ")
 
             inner_counter += 1
+            # print(inner_counter, "step 6 ")
 
         if inner_counter >= motion_loader.T:
             inner_counter = 0
             # breakpoint()
             break
-
         # Update joint visualization
         update_joint_visualization(viewer, motion_loader, inner_counter)
 

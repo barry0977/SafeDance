@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 from isaaclab.app import AppLauncher
 import glob
+import numpy as np
 
 # local imports
 import cli_args  # isort: skip
@@ -187,6 +188,17 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     timestep = 0
 
     print("Start playing...")
+    print("Available sensors:", env.unwrapped.scene.sensors.keys())
+    contact_sensor = env.unwrapped.scene.sensors["contact_forces"]
+    print(f"Contact sensor: {contact_sensor.body_names}")
+    
+    # 获取目标身体部位的索引
+    target_bodies = ["right_wrist_yaw_link", "left_wrist_yaw_link"]
+    target_body_indices = [contact_sensor.body_names.index(body) for body in target_bodies]
+    
+    # 用于记录接触力
+    force_log = []
+    
     # simulate environment
     while simulation_app.is_running():
         # run everything in inference mode
@@ -195,11 +207,59 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
             actions = policy(obs)
             # env stepping
             obs, _, _, _ = env.step(actions)
+            
+            # 获取所有目标身体部位的受力
+            forces = {}
+            total_force = 0.0
+            for body_name, idx in zip(target_bodies, target_body_indices):
+                force_vector = contact_sensor.data.net_forces_w[0, idx]  # (3,) [x, y, z]
+                force_magnitude = torch.norm(force_vector).item()
+                forces[body_name] = {
+                    "vector": force_vector.cpu().numpy(),
+                    "magnitude": force_magnitude
+                }
+                total_force += force_magnitude
+            
+            # 打印接触力信息（每10步打印一次避免刷屏）
+            print(f"\n--- Step {timestep} ---")
+            for body_name, force_data in forces.items():
+                print(f"{body_name}: {force_data['magnitude']:.2f} N, vector: {force_data['vector']}")
+            
+            # 记录力的大小用于后续分析
+            force_log.append({
+                "timestep": timestep,
+                "forces": {k: v["magnitude"] for k, v in forces.items()},
+                "total": total_force
+            })
+            
         if args_cli.video:
-            timestep += 1
             # Exit the play loop after recording one video
             if timestep == args_cli.video_length:
                 break
+        
+        timestep += 1
+
+    # 打印接触力统计信息
+    if force_log:
+        print("\n" + "="*50)
+        print("接触力统计信息")
+        print("="*50)
+        
+        for body_name in target_bodies:
+            forces_array = np.array([log["forces"][body_name] for log in force_log])
+            print(f"\n{body_name}:")
+            print(f"  平均力: {forces_array.mean():.2f} N")
+            print(f"  最大力: {forces_array.max():.2f} N")
+            print(f"  最小力: {forces_array.min():.2f} N")
+            print(f"  标准差: {forces_array.std():.2f} N")
+        
+        total_forces_array = np.array([log["total"] for log in force_log])
+        print(f"\n总接触力:")
+        print(f"  平均力: {total_forces_array.mean():.2f} N")
+        print(f"  最大力: {total_forces_array.max():.2f} N")
+        print(f"  最小力: {total_forces_array.min():.2f} N")
+        print(f"  标准差: {total_forces_array.std():.2f} N")
+        print("="*50)
 
     # close the simulator
     env.close()
